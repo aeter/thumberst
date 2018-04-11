@@ -1,0 +1,9 @@
+[package]
+name = "thumberst"
+version = "0.1.0"
+authors = ["<anackov@gmail.com>"]
+
+[dependencies]
+clap = "2.31.2"
+image = "0.18.0"
+walkdir = "2.1.4"
