@@ -1,15 +1,16 @@
 extern crate clap;
 extern crate image;
+extern crate rayon;
 extern crate walkdir;
 
-use std::fs::{canonicalize, File};
+use std::fs::File;
 use std::path::Path;
 use std::result::Result;
-use std::thread;
 
 use clap::{App, Arg};
 use image::imageops::FilterType;
-use walkdir::WalkDir;
+use rayon::prelude::*;
+use walkdir::{DirEntry, WalkDir};
 
 fn main() {
     let args = App::new("Thumberst")
@@ -40,27 +41,24 @@ fn main() {
     let width = args.value_of("thumbnail_width").unwrap_or("120").parse::<u32>().unwrap();
     let height = args.value_of("thumbnail_height").unwrap_or("120").parse::<u32>().unwrap();
 
-    let all_files = WalkDir::new(source_dir)
+    let all_files: Vec<DirEntry> = WalkDir::new(source_dir)
         .into_iter()
         .filter_map(|f| f.ok())  // only files we have access to
-        .filter(|f| !f.path().metadata().expect("failed to get dir metadata").is_dir());
+        .filter(|f| !f.path().metadata().expect("failed to get dir metadata").is_dir())
+        .collect();
 
-    let abspath = |path: &Path| { canonicalize(path).expect("Failed to get abspath") };
-
-    for rel_path in all_files {
-        let source_path = abspath(&rel_path.path());
-        let destination_path = abspath(&Path::new(destination_dir).join(rel_path.path().file_name().unwrap()));
-        let handle = thread::spawn(move || {
-            make_thumbnail(&source_path, &destination_path, width, height)
+    all_files
+        .into_par_iter()
+        .for_each(|source_path| {
+            let destination_path = Path::new(destination_dir).join(source_path.path().file_name().unwrap());
+            make_thumbnail(&source_path.path(), &destination_path, width, height)
                 .unwrap_or_else(|e| println!("src: {:?}, dest: {:?}, error: {:?}", source_path, destination_path, e));
         });
-        handle.join().unwrap();
-    }
 }
 
 fn make_thumbnail(src: &Path, dest: &Path, width: u32, height: u32) -> Result<(), image::ImageError> {
-    let img = image::open(src.to_str().unwrap())?;
+    let img = image::open(&src)?;
     let thumbnail = img.resize(width, height, FilterType::Lanczos3);
-    let ref mut out = File::create(dest.to_str().unwrap())?;
+    let ref mut out = File::create(&dest)?;
     thumbnail.save(out, image::JPEG)
 }

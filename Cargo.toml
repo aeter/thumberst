@@ -6,4 +6,5 @@ authors = ["<anackov@gmail.com>"]
 [dependencies]
 clap = "2.31.2"
 image = "0.18.0"
+rayon = "1.0.1"
 walkdir = "2.1.4"
